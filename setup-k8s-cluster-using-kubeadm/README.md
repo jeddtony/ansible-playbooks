@@ -96,3 +96,6 @@ The modular implementation includes all the same fixes as the single file versio
 - SSH access to all nodes
 - Ansible 2.9+
 - Multipass (for local development) 
+
+## Successful Setup
+When you visit the ip of one of the worker nodes port 32000, it should display the "Welcome to Nginx page"
