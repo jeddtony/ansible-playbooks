@@ -1,0 +1,44 @@
+---
+# Install CRI-O Runtime
+- name: Update apt cache
+  apt:
+    update_cache: yes
+
+- name: Install required packages
+  apt:
+    name:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - gpg
+      - software-properties-common
+    state: present
+
+- name: Add CRI-O GPG key
+  shell: |
+    curl -fsSL https://pkgs.k8s.io/addons:/cri-o:/stable:/{{ crio_version }}/deb/Release.key | 
+    gpg --dearmor -o /etc/apt/keyrings/cri-o-apt-keyring.gpg
+  args:
+    creates: /etc/apt/keyrings/cri-o-apt-keyring.gpg
+
+- name: Add CRI-O repository
+  apt_repository:
+    repo: "deb [signed-by=/etc/apt/keyrings/cri-o-apt-keyring.gpg] https://pkgs.k8s.io/addons:/cri-o:/stable:/{{ crio_version }}/deb/ /"
+    filename: cri-o
+    state: present
+
+- name: Update apt cache after adding CRI-O repo
+  apt:
+    update_cache: yes
+
+- name: Install CRI-O
+  apt:
+    name: cri-o
+    state: present
+
+- name: Enable and start CRI-O
+  systemd:
+    name: crio
+    enabled: yes
+    state: started
+    daemon_reload: yes 

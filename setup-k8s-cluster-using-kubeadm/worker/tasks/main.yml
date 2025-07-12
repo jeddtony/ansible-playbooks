@@ -1,0 +1,22 @@
+---
+# Join worker nodes to cluster
+- name: Copy join command from control plane
+  copy:
+    src: /tmp/join_command
+    dest: /tmp/join_command
+    mode: '0755'
+
+- name: Start kubelet before joining
+  systemd:
+    name: kubelet
+    state: started
+
+- name: Join worker nodes to cluster
+  shell: "{{ lookup('file', '/tmp/join_command') }}"
+  register: join_result
+  changed_when: "'This node has joined the cluster' in join_result.stdout"
+
+- name: Label worker nodes
+  shell: kubectl label node {{ ansible_hostname }} node-role.kubernetes.io/worker=worker
+  delegate_to: "{{ groups['masters'][0] }}"
+  run_once: true 

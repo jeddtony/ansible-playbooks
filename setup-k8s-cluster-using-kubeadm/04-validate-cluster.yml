@@ -1,0 +1,7 @@
+---
+- name: Validate Kubernetes Cluster
+  hosts: masters
+  become: yes
+
+  roles:
+    - validation 

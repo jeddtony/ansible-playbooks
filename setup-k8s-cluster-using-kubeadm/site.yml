@@ -1,0 +1,6 @@
+---
+# Main playbook that orchestrates the entire Kubernetes cluster setup
+- import_playbook: 01-setup-all-nodes.yml
+- import_playbook: 02-initialize-control-plane.yml
+- import_playbook: 03-join-worker-nodes.yml
+- import_playbook: 04-validate-cluster.yml 

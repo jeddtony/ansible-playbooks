@@ -1,0 +1,51 @@
+---
+# Setup Kubernetes Addons
+- name: Install Metrics Server
+  shell: kubectl apply -f https://raw.githubusercontent.com/techiescamp/cka-certification-guide/refs/heads/main/lab-setup/manifests/metrics-server/metrics-server.yaml
+  register: metrics_result
+  changed_when: "'created' in metrics_result.stdout or 'configured' in metrics_result.stdout"
+
+- name: Deploy Nginx application
+  shell: |
+    cat <<EOF | kubectl apply -f -
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: nginx-deployment
+    spec:
+      selector:
+        matchLabels:
+          app: nginx
+      replicas: 2
+      template:
+        metadata:
+          labels:
+            app: nginx
+        spec:
+          containers:
+          - name: nginx
+            image: nginx:latest
+            ports:
+            - containerPort: 80
+    EOF
+  register: nginx_deploy
+  changed_when: "'created' in nginx_deploy.stdout or 'configured' in nginx_deploy.stdout"
+
+- name: Expose Nginx service
+  shell: |
+    cat <<EOF | kubectl apply -f -
+    apiVersion: v1
+    kind: Service
+    metadata:
+      name: nginx-service
+    spec:
+      selector:
+        app: nginx
+      type: NodePort
+      ports:
+      - port: 80
+        targetPort: 80
+        nodePort: 32000
+    EOF
+  register: nginx_service
+  changed_when: "'created' in nginx_service.stdout or 'configured' in nginx_service.stdout" 

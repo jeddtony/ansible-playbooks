@@ -1,0 +1,11 @@
+---
+- name: Setup all nodes for Kubernetes
+  hosts: all
+  become: yes
+  vars:
+    control_plane_ip: "{{ ansible_default_ipv4.address }}"
+
+  roles:
+    - common
+    - cri-o
+    - kubernetes 

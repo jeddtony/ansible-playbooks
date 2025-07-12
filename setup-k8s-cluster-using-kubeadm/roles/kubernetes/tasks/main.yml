@@ -1,0 +1,56 @@
+---
+# Install Kubeadm, Kubelet & Kubectl
+- name: Add Kubernetes GPG key
+  shell: |
+    curl -fsSL https://pkgs.k8s.io/core:/stable:/{{ kubernetes_version }}/deb/Release.key | 
+    gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+  args:
+    creates: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+
+- name: Add Kubernetes repository
+  apt_repository:
+    repo: "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/{{ kubernetes_version }}/deb/ /"
+    filename: kubernetes
+    state: present
+
+- name: Update apt cache after adding Kubernetes repo
+  apt:
+    update_cache: yes
+
+- name: Install jq
+  apt:
+    name: jq
+    state: present
+
+- name: Install Kubernetes components
+  apt:
+    name:
+      - "kubelet={{ kubernetes_install_version }}"
+      - "kubeadm={{ kubernetes_install_version }}"
+      - "kubectl={{ kubernetes_install_version }}"
+    state: present
+
+- name: Hold Kubernetes packages
+  dpkg_selections:
+    name: "{{ item }}"
+    selection: hold
+  loop:
+    - kubelet
+    - kubeadm
+    - kubectl
+
+- name: Get node IP for kubelet
+  shell: ip --json addr show eth0 | jq -r '.[0].addr_info[] | select(.family == "inet") | .local'
+  register: node_ip
+
+- name: Configure kubelet with node IP
+  copy:
+    dest: /etc/default/kubelet
+    content: |
+      KUBELET_EXTRA_ARGS=--node-ip={{ node_ip.stdout }}
+
+- name: Ensure kubelet is enabled but not started yet
+  systemd:
+    name: kubelet
+    enabled: yes
+    state: stopped 

@@ -1,0 +1,7 @@
+---
+# Kubernetes Cluster Variables
+kubernetes_version: "v1.32"
+crio_version: "v1.32"
+kubernetes_install_version: "1.32.5-1.1"
+pod_cidr: "10.244.0.0/16"
+service_cidr: "10.96.0.0/12" 

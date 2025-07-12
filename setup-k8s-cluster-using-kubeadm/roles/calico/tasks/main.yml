@@ -1,0 +1,76 @@
+---
+# Install Calico Network Plugin
+- name: Install Tigera Operator
+  shell: kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.29.1/manifests/tigera-operator.yaml
+  register: tigera_result
+  changed_when: "'created' in tigera_result.stdout"
+  failed_when: tigera_result.rc != 0 and 'already exists' not in tigera_result.stderr
+
+- name: Wait for tigera-operator namespace to be created
+  shell: kubectl get namespace tigera-operator
+  register: tigera_namespace
+  retries: 10
+  delay: 10
+  until: tigera_namespace.rc == 0
+
+- name: Download Calico custom resources
+  get_url:
+    url: https://raw.githubusercontent.com/projectcalico/calico/v3.29.1/manifests/custom-resources.yaml
+    dest: /tmp/custom-resources.yaml
+
+- name: Update Calico custom resources with correct CIDR
+  replace:
+    path: /tmp/custom-resources.yaml
+    regexp: 'cidr: 192\.168\.0\.0/16'
+    replace: 'cidr: {{ pod_cidr }}'
+
+- name: Apply Calico custom resources
+  shell: kubectl apply -f /tmp/custom-resources.yaml
+  register: calico_result
+  changed_when: "'created' in calico_result.stdout or 'configured' in calico_result.stdout"
+
+- name: Debug - Check all namespaces
+  shell: kubectl get namespaces
+  register: debug_namespaces
+
+- name: Display namespaces
+  debug:
+    msg: "{{ debug_namespaces.stdout }}"
+
+- name: Debug - Check all pods in all namespaces
+  shell: kubectl get pods -A
+  register: debug_pods
+
+- name: Display all pods
+  debug:
+    msg: "{{ debug_pods.stdout }}"
+
+- name: Debug - Check Tigera Operator specifically
+  shell: kubectl get pods -n tigera-operator --show-labels
+  register: debug_tigera
+  ignore_errors: yes
+
+- name: Display Tigera Operator pods
+  debug:
+    msg: "{{ debug_tigera.stdout }}"
+
+- name: Wait for Calico pods to be ready
+  shell: |
+    # Wait for tigera-operator pods
+    kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=tigera-operator -n tigera-operator --timeout=300s || \
+    kubectl wait --for=condition=ready pod -l name=tigera-operator -n tigera-operator --timeout=300s || \
+    kubectl wait --for=condition=ready pod -n tigera-operator --timeout=300s || \
+    echo "Waiting for Calico installation to complete..."
+  register: calico_wait
+  retries: 5
+  delay: 30
+  ignore_errors: yes
+
+- name: Wait for Calico installation to complete
+  shell: |
+    # Wait for calico-node pods to appear
+    timeout 300 bash -c 'until kubectl get pods -n kube-system | grep -q calico-node; do sleep 5; done' || \
+    timeout 300 bash -c 'until kubectl get pods -A | grep -q calico; do sleep 5; done'
+  register: calico_install_wait
+  retries: 3
+  delay: 60 

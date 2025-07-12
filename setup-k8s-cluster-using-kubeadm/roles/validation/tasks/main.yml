@@ -1,0 +1,78 @@
+---
+# Validate Kubernetes Cluster
+- name: Wait for all nodes to be ready
+  shell: kubectl get nodes --no-headers | grep -v Ready | wc -l
+  register: not_ready_nodes
+  until: not_ready_nodes.stdout == "0"
+  retries: 30
+  delay: 10
+
+- name: Get cluster info
+  shell: kubectl cluster-info
+  register: cluster_info
+
+- name: Display cluster info
+  debug:
+    msg: "{{ cluster_info.stdout }}"
+
+- name: Deploy DNS utils for testing
+  shell: kubectl apply -f https://raw.githubusercontent.com/techiescamp/cka-certification-guide/refs/heads/main/lab-setup/manifests/utilities/dnsutils.yaml
+  register: dnsutils_result
+  changed_when: "'created' in dnsutils_result.stdout or 'configured' in dnsutils_result.stdout"
+
+- name: Wait for dnsutils pod to be ready
+  shell: kubectl wait --for=condition=ready pod dnsutils --timeout=300s
+
+- name: Test internal DNS resolution
+  shell: kubectl exec -i -t dnsutils -- nslookup kubernetes.default
+  register: internal_dns
+
+- name: Display internal DNS test result
+  debug:
+    msg: "{{ internal_dns.stdout }}"
+
+- name: Test external DNS resolution
+  shell: kubectl exec -i -t dnsutils -- nslookup google.com
+  register: external_dns
+
+- name: Display external DNS test result
+  debug:
+    msg: "{{ external_dns.stdout }}"
+
+- name: Cleanup dnsutils pod
+  shell: kubectl delete -f https://raw.githubusercontent.com/techiescamp/cka-certification-guide/refs/heads/main/lab-setup/manifests/utilities/dnsutils.yaml
+  ignore_errors: yes
+
+- name: Get final cluster status
+  shell: kubectl get nodes -o wide
+  register: final_status
+
+- name: Display final cluster status
+  debug:
+    msg: "{{ final_status.stdout }}"
+
+- name: Get all pods status
+  shell: kubectl get pods -A
+  register: all_pods
+
+- name: Display all pods status
+  debug:
+    msg: "{{ all_pods.stdout }}"
+
+- name: Display success message
+  debug:
+    msg: |
+      ========================================
+      Kubernetes Cluster Setup Complete!
+      ========================================
+      
+      Control Plane: {{ ansible_default_ipv4.address }}:6443
+      
+      To access the cluster from your local machine:
+      1. Copy /etc/kubernetes/admin.conf from the control plane
+      2. Set KUBECONFIG environment variable or merge with ~/.kube/config
+      
+      Test Nginx application:
+      curl http://{{ ansible_default_ipv4.address }}:32000
+      
+      Cluster validation completed successfully! 

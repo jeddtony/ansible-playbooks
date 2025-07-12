@@ -1,0 +1,11 @@
+---
+- name: Initialize Kubernetes Control Plane
+  hosts: masters
+  become: yes
+  vars:
+    control_plane_ip: "{{ ansible_default_ipv4.address }}"
+
+  roles:
+    - control-plane
+    - calico
+    - addons 
