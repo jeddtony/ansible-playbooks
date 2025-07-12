@@ -241,3 +241,7 @@ For issues and questions:
 - [Prometheus Official Documentation](https://prometheus.io/docs/)
 - [kube-state-metrics Documentation](https://github.com/kubernetes/kube-state-metrics)
 - [Kubernetes Monitoring Best Practices](https://kubernetes.io/docs/tasks/debug-application-cluster/resource-usage-monitoring/)
+
+
+## Successful Installation
+When you visit one of the worker node IP on port 30000, it will display the prometheus set up.
