@@ -1,0 +1,9 @@
+---
+- name: Deploy Prometheus Monitoring Stack
+  hosts: masters
+  become: yes
+  vars:
+    prometheus_nodeport: 30000
+
+  roles:
+    - prometheus 

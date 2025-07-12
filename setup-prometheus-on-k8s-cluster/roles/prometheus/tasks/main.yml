@@ -1,0 +1,118 @@
+---
+# Deploy Prometheus Monitoring Stack
+- name: Create monitoring namespace
+  shell: kubectl create namespace monitoring
+  register: namespace_result
+  changed_when: "'created' in namespace_result.stdout"
+  failed_when: namespace_result.rc != 0 and 'already exists' not in namespace_result.stderr
+
+- name: Copy Prometheus ClusterRole and ClusterRoleBinding
+  copy:
+    src: clusterRole.yaml
+    dest: /tmp/clusterRole.yaml
+    mode: '0644'
+
+- name: Apply ClusterRole and ClusterRoleBinding
+  shell: kubectl create -f /tmp/clusterRole.yaml
+  register: clusterrole_result
+  changed_when: "'created' in clusterrole_result.stdout"
+  failed_when: clusterrole_result.rc != 0 and 'already exists' not in clusterrole_result.stderr
+
+- name: Create Prometheus ConfigMap
+  shell: kubectl create -f https://raw.githubusercontent.com/bibinwilson/kubernetes-prometheus/master/config-map.yaml
+  register: configmap_result
+  changed_when: "'created' in configmap_result.stdout"
+  failed_when: configmap_result.rc != 0 and 'already exists' not in configmap_result.stderr
+
+- name: Copy Prometheus Deployment
+  copy:
+    src: prometheus-deployment.yaml
+    dest: /tmp/prometheus-deployment.yaml
+    mode: '0644'
+
+- name: Apply Prometheus Deployment
+  shell: kubectl create -f /tmp/prometheus-deployment.yaml
+  register: deployment_result
+  changed_when: "'created' in deployment_result.stdout"
+  failed_when: deployment_result.rc != 0 and 'already exists' not in deployment_result.stderr
+
+- name: Copy Prometheus Service
+  copy:
+    src: prometheus-service.yaml
+    dest: /tmp/prometheus-service.yaml
+    mode: '0644'
+
+- name: Apply Prometheus Service
+  shell: kubectl create -f /tmp/prometheus-service.yaml
+  register: service_result
+  changed_when: "'created' in service_result.stdout"
+  failed_when: service_result.rc != 0 and 'already exists' not in service_result.stderr
+
+- name: Clone kube-state-metrics repository
+  git:
+    repo: https://github.com/devopscube/kube-state-metrics-configs.git
+    dest: /tmp/kube-state-metrics-configs
+    force: yes
+
+- name: Apply kube-state-metrics (cluster-wide resources)
+  shell: kubectl apply -f /tmp/kube-state-metrics-configs/
+  register: ksm_cluster_result
+  changed_when: "'created' in ksm_cluster_result.stdout or 'configured' in ksm_cluster_result.stdout"
+
+- name: Wait for Prometheus deployment to be ready
+  shell: kubectl wait --for=condition=available deployment/prometheus-deployment -n monitoring --timeout=300s
+  register: prometheus_wait
+  retries: 5
+  delay: 30
+
+- name: Wait for kube-state-metrics deployment to be ready
+  shell: kubectl wait --for=condition=available deployment/kube-state-metrics -n kube-system --timeout=300s
+  register: ksm_wait
+  retries: 5
+  delay: 30
+
+- name: Get Prometheus deployment status
+  shell: kubectl get deployments --namespace=monitoring
+  register: prometheus_status
+
+- name: Display Prometheus deployment status
+  debug:
+    msg: "{{ prometheus_status.stdout }}"
+
+- name: Get kube-state-metrics deployment status
+  shell: kubectl get deployments kube-state-metrics -n kube-system
+  register: ksm_status
+
+- name: Display kube-state-metrics deployment status
+  debug:
+    msg: "{{ ksm_status.stdout }}"
+
+- name: Get Prometheus service details
+  shell: kubectl get svc prometheus-service -n monitoring
+  register: prometheus_svc
+
+- name: Display Prometheus service details
+  debug:
+    msg: "{{ prometheus_svc.stdout }}"
+
+- name: Display Prometheus access information
+  debug:
+    msg: |
+      ========================================
+      Prometheus Monitoring Stack Deployed!
+      ========================================
+      
+      Prometheus is accessible at:
+      - NodePort: http://{{ ansible_default_ipv4.address }}:30000
+      
+      To access from your local machine:
+      - Forward the port: kubectl port-forward svc/prometheus-service 9090:9090 -n monitoring
+      - Or access via NodePort: http://{{ ansible_default_ipv4.address }}:30000
+      
+      Monitoring components deployed:
+      - Prometheus Server (port 30000)
+      - kube-state-metrics (for Kubernetes metrics)
+      
+      Check the status with:
+      - kubectl get pods -n monitoring
+      - kubectl get svc -n monitoring 
